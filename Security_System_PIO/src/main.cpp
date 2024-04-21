@@ -3,16 +3,20 @@
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-#define BUZZER  53
+#define IGNITION  52
+#define BUZZER    53
 
+/* Global variables */
 bool pressed [30];
 int index;
 int pressedIndicies[30];
 int pressedCount;
 int oldCount;
 
+/* Messages to be displayed on LCD */
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
 char emptyLine[21] = "                    ";
+char ignition[21] = "    IGNITION ON     ";
 String messages[30] = 
 {
   "Entry",
@@ -59,10 +63,24 @@ void setup()
 
   /* Initialize the buzzer */
   pinMode(BUZZER, OUTPUT);
+
+  /* Initialize the Ignition */
+  pinMode(IGNITION, INPUT);
 }
 
 void loop() 
 {
+  /* Check IGNITION */
+  while (!digitalRead(IGNITION))
+  {
+    lcd.setCursor(0, 0);
+    lcd.print(ignition);
+    digitalWrite(BUZZER, HIGH);
+    delay(100);
+    digitalWrite(BUZZER, LOW);
+    delay(100);
+  }
+  
   /* Check the doors */
   pressedCount = 0;
   index = 0;
