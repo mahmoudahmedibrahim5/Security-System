@@ -1,7 +1,8 @@
 #include <Arduino.h>
-#include <LiquidCrystal_I2C.h>
+#include "LiquidCrystal_I2C.h"
 
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+LiquidCrystal_I2C lcdUp(0x27, 40, 2);
+LiquidCrystal_I2C lcdDown(0x23, 40, 2);
 
 #define IGNITION  52
 #define BUZZER    53
@@ -13,49 +14,56 @@ int pressedIndicies[30];
 int pressedCount;
 int oldCount;
 
-/* Messages to be displayed on LCD */
+/* Messages to be displayed on lcdUp */
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
-char emptyLine[21] = "                    ";
 char ignition[21] = "    IGNITION ON     ";
 String messages[30] = 
 {
-  "Entry",
+  "Entry Door",
   "Motorhome Slide",
   "Skylight",
-  "Skylight Opaque Cover Screen is not Retracted ", // not a door
-  "Skylight Insect Screen is not Retracted ", // not a door
-  "Right Kitchen Overhead Cupboard",
-  "Left Kitchen Overhead Cupboard",
+  "Skylight Opaque Cover Screen isn't Retracted",
+  "Skylight Insect Screen is not Retracted",
+  "Right Kitchen Overhead Cupboard Door",
+  "Left Kitchen Overhead Cupboard Door",
   "Top Kitchen Drawer",
   "Middle Kitchen Drawer",
   "Bottom Kitchen Drawer",
-  "Under-Sink Cupboard",
-  "Wine Slide Cabinet",
+  "Under-Sink Cupboard Door",
+  "Wine Slide Cabinet Door",
   "Utility Under Bench Flap-Door",
   "Right Utility Under-Bench Drawer",
   "Left Utility Under-Bench Drawer",
-  "IT Cupboard",
-  "Right Floor-Level Cupboard",
-  "Right-Centre Floor-Level Cupboard",
-  "Left-Centre Floor-Level Cupboard",
-  "Left Floor-Level Cupboard",
+  "IT Cupboard Door",
+  "Right Floor-Level Cupboard Door",
+  "Right-Centre Floor-Level Cupboard Door",
+  "Left-Centre Floor-Level Cupboard Door",
+  "Left Floor-Level Cupboard Door",
   "Right Floor-Level Draw",
   "Middle Floor-Level Draw",
   "Right Floor-Level Draw",
-  "Bathroom Siding",
-  "Right Bathroom Under-Vanity ", // not a door
-  "Left Bathroom Under-Vanity",
-  "Right Over-Head Locker",
-  "Centre Over-Head Locker",
-  "Left Over-Head Locker",
+  "Bathroom Siding Door",
+  "Right Bathroom Under-Vanity Door (Water Heater Area)",
+  "Left Bathroom Under-Vanity Door",
+  "Right Over-Head Locker Door",
+  "Centre Over-Head Locker Door",
+  "Left Over-Head Locker Door",
   "Bathrooms Window"
 };
 
+/* Functions prototype */
+void checkIgnition(void);
+void checkDoors(void);
+void displayPressedCount(void);
+void displayOpenedDoors(void);
+
 void setup() 
 {
-  /* Initialize the LCD */
-  lcd.init();
-  lcd.clear();
+  /* Initialize the lcdUp */
+  lcdUp.init();
+  lcdUp.clear();
+  lcdDown.init();
+  lcdDown.clear();
 
   /* Initialize input pins */
   for(int i = 22; i < 52; i++)
@@ -71,17 +79,33 @@ void setup()
 void loop() 
 {
   /* Check IGNITION */
+  checkIgnition();
+  
+  /* Check the doors */
+  checkDoors();
+
+  /* Edit the display pressed Count */
+  displayPressedCount();
+
+  /* Edit the messages of the doors */
+  displayOpenedDoors();
+}
+
+void checkIgnition(void)
+{
   while (!digitalRead(IGNITION))
   {
-    lcd.setCursor(0, 0);
-    lcd.print(ignition);
+    lcdUp.setCursor(0, 0);
+    lcdUp.print(ignition);
     digitalWrite(BUZZER, HIGH);
     delay(100);
     digitalWrite(BUZZER, LOW);
     delay(100);
   }
-  
-  /* Check the doors */
+}
+
+void checkDoors(void)
+{
   pressedCount = 0;
   index = 0;
   for(int i = 22; i < 52; i++)
@@ -98,28 +122,78 @@ void loop()
     digitalWrite(BUZZER, LOW);
   }
   oldCount = pressedCount;
+}
 
-  /* Edit the display */
+void displayPressedCount(void)
+{
   if(pressedCount > 9)
     countMessage[18] = pressedCount / 10 + '0';
   else
     countMessage[18] = ' ';
   countMessage[19] = pressedCount % 10 + '0';
-  lcd.setCursor(0, 0);
-  lcd.print(countMessage);
-
-  index = 0;
-  while (pressedCount > 0)
-  {
-    for(int i = 0; i < 3; i++)
-    {
-      lcd.setCursor(0, i + 1);
-      if(pressedCount > 0)
-        lcd.print(messages[pressedIndicies[index++]]);
-      pressedCount--;
-    }
-    delay(1000);
-    lcd.clear();
-  }
+  lcdUp.setCursor(0, 0);
+  lcdUp.print(countMessage);
 }
 
+void displayOpenedDoors(void)
+{
+  index = 0;
+  if(pressedCount == 1)
+  {
+    lcdUp.setCursor(0, 1);
+    lcdUp.print(messages[pressedIndicies[index++]]);
+    delay(1000);
+    lcdUp.clear();
+    lcdDown.clear();
+  }
+  else if(pressedCount == 2)
+  {
+    lcdUp.setCursor(0, 1);
+    lcdUp.print(messages[pressedIndicies[index++]]);
+    lcdDown.setCursor(0, 0);
+    lcdDown.print(messages[pressedIndicies[index++]]);
+    delay(1000);
+    lcdUp.clear();
+    lcdDown.clear();
+  }
+  else if(pressedCount >= 3)
+  {
+    lcdUp.setCursor(0, 1);
+    lcdUp.print(messages[pressedIndicies[index++]]);
+    lcdDown.setCursor(0, 0);
+    lcdDown.print(messages[pressedIndicies[index++]]);
+    lcdDown.setCursor(0, 1);
+    lcdDown.print(messages[pressedIndicies[index++]]);
+    delay(1000);
+    lcdUp.clear();
+    lcdDown.clear();
+
+    pressedCount -= 3;
+    while (pressedCount > 0)
+    {
+      if(pressedCount){
+        lcdUp.setCursor(0, 0);
+        lcdUp.print(messages[pressedIndicies[index++]]);
+        pressedCount--;
+      }
+      if(pressedCount){
+        lcdUp.setCursor(0, 1);
+        lcdUp.print(messages[pressedIndicies[index++]]);
+        pressedCount--;
+      }
+      if(pressedCount){
+        lcdDown.setCursor(0, 0);
+        lcdDown.print(messages[pressedIndicies[index++]]);
+        pressedCount--;
+      }
+      if(pressedCount){
+        lcdDown.setCursor(0, 1);
+        lcdDown.print(messages[pressedIndicies[index++]]);
+        pressedCount--;
+      }
+      delay(1000);
+      lcdUp.clear();
+      lcdDown.clear();
+    }
+  }
+}
