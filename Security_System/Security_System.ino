@@ -64,8 +64,10 @@ void setup()
   /* Initialize the lcdUp */
   lcdUp.init();
   lcdUp.clear();
+  lcdUp.backlight();
   lcdDown.init();
   lcdDown.clear();
+  lcdDown.backlight();
 
   /* Initialize input pins */
   for(int i = 22; i < 52; i++)
