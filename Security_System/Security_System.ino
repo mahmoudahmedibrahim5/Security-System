@@ -1,7 +1,7 @@
 #include <LiquidCrystal_I2C.h>
 
 LiquidCrystal_I2C lcdUp(0x27, 40, 2);
-LiquidCrystal_I2C lcdDown(0x26, 40, 2);
+//LiquidCrystal_I2C lcdDown(0x26, 40, 2);
 
 #define IGNITION      52
 #define BUZZER        53
@@ -69,9 +69,9 @@ void setup()
   lcdUp.init();
   lcdUp.clear();
   lcdUp.backlight();
-  lcdDown.init();
-  lcdDown.clear();
-  lcdDown.backlight();
+  //lcdDown.init();
+  //lcdDown.clear();
+  //lcdDown.backlight();
 
   /* Initialize input pins */
   for(int i = 22; i < 52; i++)
@@ -210,31 +210,15 @@ void displayOpenedDoors(void)
     lcdUp.print(messages[pressedIndicies[index++]]);
     delay(DELAY);
     lcdUp.clear();
-    lcdDown.clear();
   }
-  else if(pressedCount == 2)
+  else if(pressedCount > 1)
   {
     lcdUp.setCursor(0, 1);
     lcdUp.print(messages[pressedIndicies[index++]]);
-    lcdDown.setCursor(0, 0);
-    lcdDown.print(messages[pressedIndicies[index++]]);
     delay(DELAY);
     lcdUp.clear();
-    lcdDown.clear();
-  }
-  else if(pressedCount >= 3)
-  {
-    lcdUp.setCursor(0, 1);
-    lcdUp.print(messages[pressedIndicies[index++]]);
-    lcdDown.setCursor(0, 0);
-    lcdDown.print(messages[pressedIndicies[index++]]);
-    lcdDown.setCursor(0, 1);
-    lcdDown.print(messages[pressedIndicies[index++]]);
-    delay(DELAY);
-    lcdUp.clear();
-    lcdDown.clear();
 
-    pressedCount -= 3;
+    pressedCount--;
     while (pressedCount > 0)
     {
       if(pressedCount){
@@ -247,19 +231,71 @@ void displayOpenedDoors(void)
         lcdUp.print(messages[pressedIndicies[index++]]);
         pressedCount--;
       }
-      if(pressedCount){
-        lcdDown.setCursor(0, 0);
-        lcdDown.print(messages[pressedIndicies[index++]]);
-        pressedCount--;
-      }
-      if(pressedCount){
-        lcdDown.setCursor(0, 1);
-        lcdDown.print(messages[pressedIndicies[index++]]);
-        pressedCount--;
-      }
       delay(DELAY);
       lcdUp.clear();
-      lcdDown.clear();
     }
   }
 }
+
+// void displayOpenedDoors(void)
+// {
+//   index = 0;
+//   if(pressedCount == 1)
+//   {
+//     lcdUp.setCursor(0, 1);
+//     lcdUp.print(messages[pressedIndicies[index++]]);
+//     delay(DELAY);
+//     lcdUp.clear();
+//     lcdDown.clear();
+//   }
+//   else if(pressedCount == 2)
+//   {
+//     lcdUp.setCursor(0, 1);
+//     lcdUp.print(messages[pressedIndicies[index++]]);
+//     lcdDown.setCursor(0, 0);
+//     lcdDown.print(messages[pressedIndicies[index++]]);
+//     delay(DELAY);
+//     lcdUp.clear();
+//     lcdDown.clear();
+//   }
+//   else if(pressedCount >= 3)
+//   {
+//     lcdUp.setCursor(0, 1);
+//     lcdUp.print(messages[pressedIndicies[index++]]);
+//     lcdDown.setCursor(0, 0);
+//     lcdDown.print(messages[pressedIndicies[index++]]);
+//     lcdDown.setCursor(0, 1);
+//     lcdDown.print(messages[pressedIndicies[index++]]);
+//     delay(DELAY);
+//     lcdUp.clear();
+//     lcdDown.clear();
+
+//     pressedCount -= 3;
+//     while (pressedCount > 0)
+//     {
+//       if(pressedCount){
+//         lcdUp.setCursor(0, 0);
+//         lcdUp.print(messages[pressedIndicies[index++]]);
+//         pressedCount--;
+//       }
+//       if(pressedCount){
+//         lcdUp.setCursor(0, 1);
+//         lcdUp.print(messages[pressedIndicies[index++]]);
+//         pressedCount--;
+//       }
+//       if(pressedCount){
+//         lcdDown.setCursor(0, 0);
+//         lcdDown.print(messages[pressedIndicies[index++]]);
+//         pressedCount--;
+//       }
+//       if(pressedCount){
+//         lcdDown.setCursor(0, 1);
+//         lcdDown.print(messages[pressedIndicies[index++]]);
+//         pressedCount--;
+//       }
+//       delay(DELAY);
+//       lcdUp.clear();
+//       lcdDown.clear();
+//     }
+//   }
+// }
