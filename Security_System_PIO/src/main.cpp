@@ -1,8 +1,7 @@
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcdUp(0x27, 40, 2);
-//LiquidCrystal_I2C lcdDown(0x26, 40, 2);
+LiquidCrystal_I2C lcd(0x27, 40, 2);
 
 #define IGNITION      52
 #define BUZZER        53
@@ -10,54 +9,68 @@ LiquidCrystal_I2C lcdUp(0x27, 40, 2);
 #define BUZZER_DELAY  100   // Delay of the ignition 10 beeps
 
 /* Global variables */
-bool pressed [33];
+bool ignitionState;
+bool pressed [45];
 int index;
-int pressedIndicies[33];
+int pressedIndicies[45];
 int pressedCount;
 int oldCount;
 
-/* Messages to be displayed on lcdUp */
+/* Messages to be displayed on lcd */
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
 char ignition[21] = "    IGNITION ON     ";
-String messages[33] = 
+String messages[45] = 
 {
-  "Entry Door",
-  "Motorhome Slide",
-  "Skylight",
-  "Skylight Opaque Screen not Retracted",
+  "*** MOTORHOME SLIDE IS OUT ",
+  " ENTRY DOOR IS OPEN ",
+  " BATHROOM DOOR IS UNSECURED ",
+  " SKYLIGHT HATCH IS OPEN ***",
+  "EXT-LOCKER IS OPEN - PASSENGER SIDE",
+  "EXT-LOCKER IS OPEN - DRIVER SIDE",
+  "Skylight Opaque Screen is not Retracted",
   "Skylight Insect Screen is not Retracted",
-  "Right Kitchen Overhead Cupboard Door",
-  "Left Kitchen Overhead Cupboard Door",
-  "Top Kitchen Drawer",
-  "Middle Kitchen Drawer",
-  "Bottom Kitchen Drawer",
-  "Under-Sink Cupboard Door",
-  "Wine Slide Cabinet Door",
-  "Utility Under Bench Flap-Door",
-  "Right Utility Under-Bench Drawer",
-  "Left Utility Under-Bench Drawer",
-  "IT Cupboard Door",
-  "Right Floor-Level Cupboard Door",
-  "Right-Centre Floor-Level Cupboard Door",
-  "Left-Centre Floor-Level Cupboard Door",
-  "Left Floor-Level Cupboard Door",
-  "Right Floor-Level Draw",
-  "Middle Floor-Level Draw",
-  "Right Floor-Level Draw",
-  "Bathroom Siding Door",
-  "Right Under-Vanity Door (HWS)",
-  "Left Bathroom Under-Vanity Door",
-  "Right Over-Head Locker Door",
-  "Centre Over-Head Locker Door",
-  "Left Over-Head Locker Door",
-  "Bathrooms Window",
-  "Shore Power is still connected",
-  "Driver-Side Locker",
-  "Passenger-Side Locker"
+  "Kitchen Window is Open",
+  "Right Kitchen O/head Cupboard Door Open",
+  "Left Kitchen O/head Cupboard Door Open",
+  "Top Kitchen Drawer is Hanging Open",
+  "Middle Kitchen Drawer is Hanging Open",
+  "Bottom Kitchen Drawer is Hanging Open",
+  "Under-Sink Cupboard Door is Open",
+  "Wine Slide Cabinet Door is Hanging Open",
+  "Utility U/Bench Flap-Door is Open",
+  "Rt Utility U/Bench Drawer Hanging Open",
+  "Lt Utility U/Bench Drawer Hanging Open",
+  "Starlink IT Cabinet Door is Open",
+  "Right Floor-Level Cupboard Door is Open",
+  "Rt-Centre Floor-Lvl Cupboard Door Open",
+  "Lt-Centre Floor-Lvl Cupboard Door Open",
+  "Left Floor-Level Cupboard Door is Open",
+  "Right Floor-Level Drawer is Hanging Open",
+  "Mid Floor-Level Drawer is Hanging Open",
+  "Rt Floor-Level Drawer is Hanging Open",
+  "Right Under-Vanity Door (HWS) is Open",
+  "Left Bathroom Under-Vanity Door is Open",
+  "Right Over-Head Locker Door is Open",
+  "Centre Over-Head Locker Door is Open",
+  "Left Over-Head Locker Door is Open",
+  "Shower Ventilation Port is Open",
+  "Bathroom Window is Open",
+  "*** SHORE POWER IS STILL CONNECTED ***",
+  "Left Over-bed Locker is Open",
+  "Right Over-bed Locker is Open",
+  "Top Bedside Wardrobe Open",
+  "Bottom Bedside Wardrobe Open",
+  "Bed Window is Open",
+  "Left Diner Locker is Open",
+  "Right Diner Locker is Open",
+  "Diner Window is Open",
+  "Lithium Battery Cabinet is Open",
+  "Inverter Cabinet is Open"
 };
 
 /* Functions prototype */
 void checkIgnition(void);
+void sendIgnitionState(void);
 void checkDoors(void);
 void newDoorBuzzer(void);
 void displayPressedCount(void);
@@ -66,13 +79,12 @@ void displayOpenedDoors(void);
 
 void setup() 
 {
-  /* Initialize the lcdUp */
-  lcdUp.init();
-  lcdUp.clear();
-  lcdUp.backlight();
-  //lcdDown.init();
-  //lcdDown.clear();
-  //lcdDown.backlight();
+  Serial.begin(9600);
+
+  /* Initialize the lcd */
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
 
   /* Initialize input pins */
   for(int i = 22; i < 52; i++)
@@ -93,6 +105,9 @@ void loop()
   /* Check IGNITION */
   checkIgnition();
   
+  /* Send data to the Arduino UNO */
+  sendIgnitionState();
+
   /* Check the doors */
   checkDoors();
 
@@ -116,12 +131,13 @@ void loop()
 void checkIgnition(void)
 {
   int beeps = 0;
-  while (!digitalRead(IGNITION))
+  ignitionState = digitalRead(IGNITION);
+  while (!ignitionState)
   {
     checkDoors();
     displayBacklight();
-    lcdUp.setCursor(0, 0);
-    lcdUp.print(ignition);
+    lcd.setCursor(0, 0);
+    lcd.print(ignition);
     if(beeps >= 10)
     {
       digitalWrite(BUZZER, HIGH);
@@ -138,6 +154,11 @@ void checkIgnition(void)
       beeps++;
     }
   }
+}
+
+void sendIgnitionState(void)
+{
+  
 }
 
 void checkDoors(void)
@@ -190,16 +211,16 @@ void displayPressedCount(void)
   else
     countMessage[18] = ' ';
   countMessage[19] = pressedCount % 10 + '0';
-  lcdUp.setCursor(0, 0);
-  lcdUp.print(countMessage);
+  lcd.setCursor(0, 0);
+  lcd.print(countMessage);
 }
 
 void displayBacklight(void)
 {
   if(pressedCount > 0)
-    lcdUp.backlight();
+    lcd.backlight();
   else
-    lcdUp.noBacklight();
+    lcd.noBacklight();
 }
 
 void displayOpenedDoors(void)
@@ -207,96 +228,33 @@ void displayOpenedDoors(void)
   index = 0;
   if(pressedCount == 1)
   {
-    lcdUp.setCursor(0, 1);
-    lcdUp.print(messages[pressedIndicies[index++]]);
+    lcd.setCursor(0, 1);
+    lcd.print(messages[pressedIndicies[index++]]);
     delay(DELAY);
-    lcdUp.clear();
+    lcd.clear();
   }
   else if(pressedCount > 1)
   {
-    lcdUp.setCursor(0, 1);
-    lcdUp.print(messages[pressedIndicies[index++]]);
+    lcd.setCursor(0, 1);
+    lcd.print(messages[pressedIndicies[index++]]);
     delay(DELAY);
-    lcdUp.clear();
+    lcd.clear();
 
     pressedCount--;
     while (pressedCount > 0)
     {
       if(pressedCount){
-        lcdUp.setCursor(0, 0);
-        lcdUp.print(messages[pressedIndicies[index++]]);
+        lcd.setCursor(0, 0);
+        lcd.print(messages[pressedIndicies[index++]]);
         pressedCount--;
       }
       if(pressedCount){
-        lcdUp.setCursor(0, 1);
-        lcdUp.print(messages[pressedIndicies[index++]]);
+        lcd.setCursor(0, 1);
+        lcd.print(messages[pressedIndicies[index++]]);
         pressedCount--;
       }
       delay(DELAY);
-      lcdUp.clear();
+      lcd.clear();
     }
   }
 }
-
-// void displayOpenedDoors(void)
-// {
-//   index = 0;
-//   if(pressedCount == 1)
-//   {
-//     lcdUp.setCursor(0, 1);
-//     lcdUp.print(messages[pressedIndicies[index++]]);
-//     delay(DELAY);
-//     lcdUp.clear();
-//     lcdDown.clear();
-//   }
-//   else if(pressedCount == 2)
-//   {
-//     lcdUp.setCursor(0, 1);
-//     lcdUp.print(messages[pressedIndicies[index++]]);
-//     lcdDown.setCursor(0, 0);
-//     lcdDown.print(messages[pressedIndicies[index++]]);
-//     delay(DELAY);
-//     lcdUp.clear();
-//     lcdDown.clear();
-//   }
-//   else if(pressedCount >= 3)
-//   {
-//     lcdUp.setCursor(0, 1);
-//     lcdUp.print(messages[pressedIndicies[index++]]);
-//     lcdDown.setCursor(0, 0);
-//     lcdDown.print(messages[pressedIndicies[index++]]);
-//     lcdDown.setCursor(0, 1);
-//     lcdDown.print(messages[pressedIndicies[index++]]);
-//     delay(DELAY);
-//     lcdUp.clear();
-//     lcdDown.clear();
-
-//     pressedCount -= 3;
-//     while (pressedCount > 0)
-//     {
-//       if(pressedCount){
-//         lcdUp.setCursor(0, 0);
-//         lcdUp.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       if(pressedCount){
-//         lcdUp.setCursor(0, 1);
-//         lcdUp.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       if(pressedCount){
-//         lcdDown.setCursor(0, 0);
-//         lcdDown.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       if(pressedCount){
-//         lcdDown.setCursor(0, 1);
-//         lcdDown.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       delay(DELAY);
-//       lcdUp.clear();
-//       lcdDown.clear();
-//     }
-//   }
-// }
