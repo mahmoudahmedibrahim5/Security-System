@@ -79,6 +79,7 @@ void displayOpenedDoors(void);
 
 void setup() 
 {
+  /* Initialize The Bluetooth Module */
   Serial.begin(9600);
 
   /* Initialize the lcd */
@@ -92,6 +93,7 @@ void setup()
   pinMode(A0, INPUT);
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
+  pinMode(A3, INPUT);
 
   /* Initialize the buzzer */
   pinMode(BUZZER, OUTPUT);
@@ -102,11 +104,11 @@ void setup()
 
 void loop() 
 {
+  /* Arduino UNO Inputs */
+  sendIgnitionState();
+
   /* Check IGNITION */
   checkIgnition();
-  
-  /* Send data to the Arduino UNO */
-  sendIgnitionState();
 
   /* Check the doors */
   checkDoors();
@@ -128,11 +130,39 @@ void loop()
 /************************************* Functions Declaration *************************************/
 /*************************************************************************************************/
 
+void sendIgnitionState(void)
+{
+  ignitionState = digitalRead(IGNITION);
+  if(ignitionState)
+  {
+    Serial.println("OFF");
+    for(int i = 0; i < 11; i++)
+    {
+      pressed[34 + i] = 0;
+    }
+  }
+  else
+  {
+    Serial.println("ON");
+    while (!Serial.available());
+    String receivedMessage;
+    receivedMessage = Serial.readString();
+    for(int i = 0; i < 11; i++)
+    {
+      if(receivedMessage[i] == '0')
+        pressed[34 + i] = 0;
+      else if(receivedMessage[i] == '1')
+        pressed[34 + i] = 1;
+      else
+        Serial.println("Error");
+    }
+  }
+}
+
 void checkIgnition(void)
 {
   int beeps = 0;
-  ignitionState = digitalRead(IGNITION);
-  while (!ignitionState)
+  while (!digitalRead(IGNITION))
   {
     checkDoors();
     displayBacklight();
@@ -154,11 +184,6 @@ void checkIgnition(void)
       beeps++;
     }
   }
-}
-
-void sendIgnitionState(void)
-{
-  
 }
 
 void checkDoors(void)
@@ -192,6 +217,20 @@ void checkDoors(void)
     pressedIndicies[index++] = 32;
   }
 
+  pressed[33] = digitalRead(A3);
+  if(pressed[33]){
+    pressedCount++;
+    pressedIndicies[index++] = 33;
+  }
+
+  /* Inputs connected to Arduino UNO */
+  for(int i = 34; i < 45; i++)
+  {
+    if(pressed[i]){
+      pressedCount++;
+      pressedIndicies[index++] = i;
+    }
+  }
 }
 
 void newDoorBuzzer(void)
