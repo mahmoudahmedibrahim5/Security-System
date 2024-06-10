@@ -15,10 +15,15 @@ int index;
 int pressedIndicies[45];
 int pressedCount;
 int oldCount;
+int buzzerDelay;
+
+/* Timing variables */
+unsigned long long previous;
 
 /* Messages to be displayed on lcd */
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
 char ignition[21] = "    IGNITION ON     ";
+
 String messages[45] = 
 {
   "*** MOTORHOME SLIDE IS OUT ",
@@ -51,10 +56,10 @@ String messages[45] =
   "Right Under-Vanity Door (HWS) is Open",
   "Left Bathroom Under-Vanity Door is Open",
   "Right Over-Head Locker Door is Open",
-  "Centre Over-Head Locker Door is Open",
-  "Left Over-Head Locker Door is Open",
-  "Shower Ventilation Port is Open",
-  "Bathroom Window is Open",
+  "Centre Over-Head Locker Door is Open", 
+  "Left Over-Head Locker Door is Open",   
+  "Shower Ventilation Port is Open",      
+  "Bathroom Window is Open",              
   "*** SHORE POWER IS STILL CONNECTED ***",
   "Left Over-bed Locker is Open",
   "Right Over-bed Locker is Open",
@@ -72,7 +77,8 @@ String messages[45] =
 void checkIgnition(void);
 void sendIgnitionState(void);
 void checkDoors(void);
-void newDoorBuzzer(void);
+//void newDoorBuzzer(void);
+void buzzer(void);
 void displayPressedCount(void);
 void displayBacklight(void);
 void displayOpenedDoors(void);
@@ -104,17 +110,20 @@ void setup()
 
 void loop() 
 {
-  /* Arduino UNO Inputs */
-  sendIgnitionState();
-
   /* Check IGNITION */
   checkIgnition();
+
+  /* Arduino UNO Inputs */
+  sendIgnitionState();
 
   /* Check the doors */
   checkDoors();
 
   /* Buzzer if new door is opened */
   newDoorBuzzer();
+
+  /* Continous buzzer */
+  buzzer();
 
   /* Edit the display pressed Count */
   displayPressedCount();
@@ -132,56 +141,39 @@ void loop()
 
 void sendIgnitionState(void)
 {
-  ignitionState = digitalRead(IGNITION);
-  if(ignitionState)
+  Serial.println("ON");
+  while (!Serial.available());
+  String receivedMessage;
+  receivedMessage = Serial.readString();
+  for(int i = 0; i < 11; i++)
   {
-    Serial.println("OFF");
-    for(int i = 0; i < 11; i++)
-    {
+    if(receivedMessage[i] == '0')
       pressed[34 + i] = 0;
-    }
-  }
-  else
-  {
-    Serial.println("ON");
-    while (!Serial.available());
-    String receivedMessage;
-    receivedMessage = Serial.readString();
-    for(int i = 0; i < 11; i++)
-    {
-      if(receivedMessage[i] == '0')
-        pressed[34 + i] = 0;
-      else if(receivedMessage[i] == '1')
-        pressed[34 + i] = 1;
-      else
-        Serial.println("Error");
-    }
+    else if(receivedMessage[i] == '1')
+      pressed[34 + i] = 1;
+    else
+      Serial.println("Error");
   }
 }
 
 void checkIgnition(void)
 {
-  int beeps = 0;
-  while (!digitalRead(IGNITION))
+  if(digitalRead(IGNITION)) // If the ignition is off
   {
-    checkDoors();
-    displayBacklight();
-    lcd.setCursor(0, 0);
-    lcd.print(ignition);
-    if(beeps >= 10)
-    {
-      digitalWrite(BUZZER, HIGH);
-      delay(DELAY);
-      digitalWrite(BUZZER, LOW);
-      delay(DELAY);
-    }
-    else
+    Serial.println("OFF");  // Tell the UNO to sleep
+    /* Turn Off LCD */
+    lcd.clear();        
+    lcd.noBacklight();
+    
+    while (digitalRead(IGNITION));  // Wait until it's on
+    previous = millis();
+    /* 10 Wakeup Beeps */
+    for(int i = 0; i < 10; i++)
     {
       digitalWrite(BUZZER, HIGH);
       delay(BUZZER_DELAY);
       digitalWrite(BUZZER, LOW);
       delay(BUZZER_DELAY);
-      beeps++;
     }
   }
 }
@@ -231,6 +223,12 @@ void checkDoors(void)
       pressedIndicies[index++] = i;
     }
   }
+
+  /* Continous Buzzer Delay */
+  if(pressed[0] || pressed[3] || pressed[34]) // Important pins
+    buzzerDelay = 1000;
+  else
+    buzzerDelay = 60000;
 }
 
 void newDoorBuzzer(void)
@@ -241,6 +239,17 @@ void newDoorBuzzer(void)
     digitalWrite(BUZZER, LOW);
   }
   oldCount = pressedCount;
+}
+
+void buzzer()
+{
+  if(millis() - previous > buzzerDelay){
+    previous = millis();
+    digitalWrite(BUZZER, HIGH);
+    delay(BUZZER_DELAY);
+    digitalWrite(BUZZER, LOW);
+    delay(BUZZER_DELAY);
+  }
 }
 
 void displayPressedCount(void)
