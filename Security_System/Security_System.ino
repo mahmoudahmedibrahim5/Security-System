@@ -1,7 +1,7 @@
+#include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcdUp(0x27, 40, 2);
-//LiquidCrystal_I2C lcdDown(0x26, 40, 2);
+LiquidCrystal_I2C lcd(0x27, 40, 2);
 
 #define IGNITION      52
 #define BUZZER        53
@@ -9,69 +9,89 @@ LiquidCrystal_I2C lcdUp(0x27, 40, 2);
 #define BUZZER_DELAY  100   // Delay of the ignition 10 beeps
 
 /* Global variables */
-bool pressed [33];
+bool ignitionState;
+bool pressed [45];
 int index;
-int pressedIndicies[33];
+int pressedIndicies[45];
 int pressedCount;
 int oldCount;
+int buzzerDelay;
 
-/* Messages to be displayed on lcdUp */
+/* Timing variables */
+unsigned long long previous;
+
+/* Messages to be displayed on lcd */
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
 char ignition[21] = "    IGNITION ON     ";
-String messages[33] = 
+
+String messages[45] = 
 {
-  "Entry Door",
-  "Motorhome Slide",
-  "Skylight",
-  "Skylight Opaque Screen not Retracted",
+  "*** MOTORHOME SLIDE IS OUT ",
+  " ENTRY DOOR IS OPEN ",
+  " BATHROOM DOOR IS UNSECURED ",
+  " SKYLIGHT HATCH IS OPEN ***",
+  "EXT-LOCKER IS OPEN - PASSENGER SIDE",
+  "EXT-LOCKER IS OPEN - DRIVER SIDE",
+  "Skylight Opaque Screen is not Retracted",
   "Skylight Insect Screen is not Retracted",
-  "Right Kitchen Overhead Cupboard Door",
-  "Left Kitchen Overhead Cupboard Door",
-  "Top Kitchen Drawer",
-  "Middle Kitchen Drawer",
-  "Bottom Kitchen Drawer",
-  "Under-Sink Cupboard Door",
-  "Wine Slide Cabinet Door",
-  "Utility Under Bench Flap-Door",
-  "Right Utility Under-Bench Drawer",
-  "Left Utility Under-Bench Drawer",
-  "IT Cupboard Door",
-  "Right Floor-Level Cupboard Door",
-  "Right-Centre Floor-Level Cupboard Door",
-  "Left-Centre Floor-Level Cupboard Door",
-  "Left Floor-Level Cupboard Door",
-  "Right Floor-Level Draw",
-  "Middle Floor-Level Draw",
-  "Right Floor-Level Draw",
-  "Bathroom Siding Door",
-  "Right Under-Vanity Door (HWS)",
-  "Left Bathroom Under-Vanity Door",
-  "Right Over-Head Locker Door",
-  "Centre Over-Head Locker Door",
-  "Left Over-Head Locker Door",
-  "Bathrooms Window",
-  "Shore Power is still connected",
-  "Driver-Side Locker",
-  "Passenger-Side Locker"
+  "Kitchen Window is Open",
+  "Right Kitchen O/head Cupboard Door Open",
+  "Left Kitchen O/head Cupboard Door Open",
+  "Top Kitchen Drawer is Hanging Open",
+  "Middle Kitchen Drawer is Hanging Open",
+  "Bottom Kitchen Drawer is Hanging Open",
+  "Under-Sink Cupboard Door is Open",
+  "Wine Slide Cabinet Door is Hanging Open",
+  "Utility U/Bench Flap-Door is Open",
+  "Rt Utility U/Bench Drawer Hanging Open",
+  "Lt Utility U/Bench Drawer Hanging Open",
+  "Starlink IT Cabinet Door is Open",
+  "Right Floor-Level Cupboard Door is Open",
+  "Rt-Centre Floor-Lvl Cupboard Door Open",
+  "Lt-Centre Floor-Lvl Cupboard Door Open",
+  "Left Floor-Level Cupboard Door is Open",
+  "Right Floor-Level Drawer is Hanging Open",
+  "Mid Floor-Level Drawer is Hanging Open",
+  "Rt Floor-Level Drawer is Hanging Open",
+  "Right Under-Vanity Door (HWS) is Open",
+  "Left Bathroom Under-Vanity Door is Open",
+  "Right Over-Head Locker Door is Open",
+  "Centre Over-Head Locker Door is Open", 
+  "Left Over-Head Locker Door is Open",   
+  "Shower Ventilation Port is Open",      
+  "Bathroom Window is Open",              
+  "*** SHORE POWER IS STILL CONNECTED ***",
+  "Left Over-bed Locker is Open",
+  "Right Over-bed Locker is Open",
+  "Top Bedside Wardrobe Open",
+  "Bottom Bedside Wardrobe Open",
+  "Bed Window is Open",
+  "Left Diner Locker is Open",
+  "Right Diner Locker is Open",
+  "Diner Window is Open",
+  "Lithium Battery Cabinet is Open",
+  "Inverter Cabinet is Open"
 };
 
 /* Functions prototype */
 void checkIgnition(void);
+void sendIgnitionState(void);
 void checkDoors(void);
-void newDoorBuzzer(void);
+//void newDoorBuzzer(void);
+void buzzer(void);
 void displayPressedCount(void);
 void displayBacklight(void);
 void displayOpenedDoors(void);
 
 void setup() 
 {
-  /* Initialize the lcdUp */
-  lcdUp.init();
-  lcdUp.clear();
-  lcdUp.backlight();
-  //lcdDown.init();
-  //lcdDown.clear();
-  //lcdDown.backlight();
+  /* Initialize The Bluetooth Module */
+  Serial.begin(9600);
+
+  /* Initialize the lcd */
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
 
   /* Initialize input pins */
   for(int i = 22; i < 52; i++)
@@ -79,6 +99,7 @@ void setup()
   pinMode(A0, INPUT);
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
+  pinMode(A3, INPUT);
 
   /* Initialize the buzzer */
   pinMode(BUZZER, OUTPUT);
@@ -91,12 +112,18 @@ void loop()
 {
   /* Check IGNITION */
   checkIgnition();
-  
+
+  /* Arduino UNO Inputs */
+  sendIgnitionState();
+
   /* Check the doors */
   checkDoors();
 
   /* Buzzer if new door is opened */
   newDoorBuzzer();
+
+  /* Continous buzzer */
+  buzzer();
 
   /* Edit the display pressed Count */
   displayPressedCount();
@@ -112,29 +139,41 @@ void loop()
 /************************************* Functions Declaration *************************************/
 /*************************************************************************************************/
 
+void sendIgnitionState(void)
+{
+  Serial.println("ON");
+  while (!Serial.available());
+  String receivedMessage;
+  receivedMessage = Serial.readString();
+  for(int i = 0; i < 11; i++)
+  {
+    if(receivedMessage[i] == '0')
+      pressed[34 + i] = 0;
+    else if(receivedMessage[i] == '1')
+      pressed[34 + i] = 1;
+    else
+      Serial.println("Error");
+  }
+}
+
 void checkIgnition(void)
 {
-  int beeps = 0;
-  while (!digitalRead(IGNITION))
+  if(digitalRead(IGNITION)) // If the ignition is off
   {
-    checkDoors();
-    displayBacklight();
-    lcdUp.setCursor(0, 0);
-    lcdUp.print(ignition);
-    if(beeps >= 10)
-    {
-      digitalWrite(BUZZER, HIGH);
-      delay(DELAY);
-      digitalWrite(BUZZER, LOW);
-      delay(DELAY);
-    }
-    else
+    Serial.println("OFF");  // Tell the UNO to sleep
+    /* Turn Off LCD */
+    lcd.clear();        
+    lcd.noBacklight();
+    
+    while (digitalRead(IGNITION));  // Wait until it's on
+    previous = millis();
+    /* 10 Wakeup Beeps */
+    for(int i = 0; i < 10; i++)
     {
       digitalWrite(BUZZER, HIGH);
       delay(BUZZER_DELAY);
       digitalWrite(BUZZER, LOW);
       delay(BUZZER_DELAY);
-      beeps++;
     }
   }
 }
@@ -170,6 +209,26 @@ void checkDoors(void)
     pressedIndicies[index++] = 32;
   }
 
+  pressed[33] = digitalRead(A3);
+  if(pressed[33]){
+    pressedCount++;
+    pressedIndicies[index++] = 33;
+  }
+
+  /* Inputs connected to Arduino UNO */
+  for(int i = 34; i < 45; i++)
+  {
+    if(pressed[i]){
+      pressedCount++;
+      pressedIndicies[index++] = i;
+    }
+  }
+
+  /* Continous Buzzer Delay */
+  if(pressed[0] || pressed[3] || pressed[34]) // Important pins
+    buzzerDelay = 1000;
+  else
+    buzzerDelay = 60000;
 }
 
 void newDoorBuzzer(void)
@@ -182,6 +241,17 @@ void newDoorBuzzer(void)
   oldCount = pressedCount;
 }
 
+void buzzer()
+{
+  if(millis() - previous > buzzerDelay){
+    previous = millis();
+    digitalWrite(BUZZER, HIGH);
+    delay(BUZZER_DELAY);
+    digitalWrite(BUZZER, LOW);
+    delay(BUZZER_DELAY);
+  }
+}
+
 void displayPressedCount(void)
 {
   if(pressedCount > 9)
@@ -189,16 +259,16 @@ void displayPressedCount(void)
   else
     countMessage[18] = ' ';
   countMessage[19] = pressedCount % 10 + '0';
-  lcdUp.setCursor(0, 0);
-  lcdUp.print(countMessage);
+  lcd.setCursor(0, 0);
+  lcd.print(countMessage);
 }
 
 void displayBacklight(void)
 {
   if(pressedCount > 0)
-    lcdUp.backlight();
+    lcd.backlight();
   else
-    lcdUp.noBacklight();
+    lcd.noBacklight();
 }
 
 void displayOpenedDoors(void)
@@ -206,96 +276,33 @@ void displayOpenedDoors(void)
   index = 0;
   if(pressedCount == 1)
   {
-    lcdUp.setCursor(0, 1);
-    lcdUp.print(messages[pressedIndicies[index++]]);
+    lcd.setCursor(0, 1);
+    lcd.print(messages[pressedIndicies[index++]]);
     delay(DELAY);
-    lcdUp.clear();
+    lcd.clear();
   }
   else if(pressedCount > 1)
   {
-    lcdUp.setCursor(0, 1);
-    lcdUp.print(messages[pressedIndicies[index++]]);
+    lcd.setCursor(0, 1);
+    lcd.print(messages[pressedIndicies[index++]]);
     delay(DELAY);
-    lcdUp.clear();
+    lcd.clear();
 
     pressedCount--;
     while (pressedCount > 0)
     {
       if(pressedCount){
-        lcdUp.setCursor(0, 0);
-        lcdUp.print(messages[pressedIndicies[index++]]);
+        lcd.setCursor(0, 0);
+        lcd.print(messages[pressedIndicies[index++]]);
         pressedCount--;
       }
       if(pressedCount){
-        lcdUp.setCursor(0, 1);
-        lcdUp.print(messages[pressedIndicies[index++]]);
+        lcd.setCursor(0, 1);
+        lcd.print(messages[pressedIndicies[index++]]);
         pressedCount--;
       }
       delay(DELAY);
-      lcdUp.clear();
+      lcd.clear();
     }
   }
 }
-
-// void displayOpenedDoors(void)
-// {
-//   index = 0;
-//   if(pressedCount == 1)
-//   {
-//     lcdUp.setCursor(0, 1);
-//     lcdUp.print(messages[pressedIndicies[index++]]);
-//     delay(DELAY);
-//     lcdUp.clear();
-//     lcdDown.clear();
-//   }
-//   else if(pressedCount == 2)
-//   {
-//     lcdUp.setCursor(0, 1);
-//     lcdUp.print(messages[pressedIndicies[index++]]);
-//     lcdDown.setCursor(0, 0);
-//     lcdDown.print(messages[pressedIndicies[index++]]);
-//     delay(DELAY);
-//     lcdUp.clear();
-//     lcdDown.clear();
-//   }
-//   else if(pressedCount >= 3)
-//   {
-//     lcdUp.setCursor(0, 1);
-//     lcdUp.print(messages[pressedIndicies[index++]]);
-//     lcdDown.setCursor(0, 0);
-//     lcdDown.print(messages[pressedIndicies[index++]]);
-//     lcdDown.setCursor(0, 1);
-//     lcdDown.print(messages[pressedIndicies[index++]]);
-//     delay(DELAY);
-//     lcdUp.clear();
-//     lcdDown.clear();
-
-//     pressedCount -= 3;
-//     while (pressedCount > 0)
-//     {
-//       if(pressedCount){
-//         lcdUp.setCursor(0, 0);
-//         lcdUp.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       if(pressedCount){
-//         lcdUp.setCursor(0, 1);
-//         lcdUp.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       if(pressedCount){
-//         lcdDown.setCursor(0, 0);
-//         lcdDown.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       if(pressedCount){
-//         lcdDown.setCursor(0, 1);
-//         lcdDown.print(messages[pressedIndicies[index++]]);
-//         pressedCount--;
-//       }
-//       delay(DELAY);
-//       lcdUp.clear();
-//       lcdDown.clear();
-//     }
-//   }
-// }
