@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 /* Global variables */
 bool pressed [11];
 bool sleep;
@@ -26,7 +28,7 @@ void loop()
     checkInputs();
     sendData();
   }
-  delay(500);
+  delay(50);
 }
 
 void checkInputs(void)
@@ -39,8 +41,6 @@ void receiveData(void)
 {
   while (!Serial.available());
   receivedMessage = Serial.readString();
-  //Serial.print("Received message is: ");
-  //Serial.println(receivedMessage);
   if(receivedMessage[1] == 'F')
     sleep = true;
   else if(receivedMessage[1] == 'N')
