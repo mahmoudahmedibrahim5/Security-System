@@ -10,9 +10,9 @@ LiquidCrystal_I2C lcd(0x27, 40, 2);
 
 /* Global variables */
 bool ignitionState;
-bool pressed [45];
+bool pressed [46];
 int index;
-int pressedIndicies[45];
+int pressedIndicies[46];
 int pressedCount;
 int oldCount;
 int buzzerDelay;
@@ -24,7 +24,7 @@ unsigned long long previous;
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
 char ignition[21] = "    IGNITION ON     ";
 
-String messages[45] = 
+String messages[46] = 
 {
   "*** MOTORHOME SLIDE IS OUT ",
   " ENTRY DOOR IS OPEN ",
@@ -59,7 +59,8 @@ String messages[45] =
   "Centre Over-Head Locker Door is Open", 
   "Left Over-Head Locker Door is Open",   
   "Shower Ventilation Port is Open",      
-  "Bathroom Window is Open",              
+  "Bathroom Window is Open",
+  "** Steps Failed to Retract **",              
   "*** SHORE POWER IS STILL CONNECTED ***",
   "Left Over-bed Locker is Open",
   "Right Over-bed Locker is Open",
@@ -100,6 +101,7 @@ void setup()
   pinMode(A1, INPUT);
   pinMode(A2, INPUT);
   pinMode(A3, INPUT);
+  pinMode(A4, INPUT);
 
   /* Initialize the buzzer */
   pinMode(BUZZER, OUTPUT);
@@ -148,9 +150,9 @@ void sendIgnitionState(void)
   for(int i = 0; i < 11; i++)
   {
     if(receivedMessage[i] == '0')
-      pressed[34 + i] = 0;
+      pressed[35 + i] = 0;
     else if(receivedMessage[i] == '1')
-      pressed[34 + i] = 1;
+      pressed[35 + i] = 1;
     else
       Serial.println("Error");
   }
@@ -215,8 +217,14 @@ void checkDoors(void)
     pressedIndicies[index++] = 33;
   }
 
+  pressed[34] = digitalRead(A4);
+  if(pressed[34]){
+    pressedCount++;
+    pressedIndicies[index++] = 34;
+  }
+
   /* Inputs connected to Arduino UNO */
-  for(int i = 34; i < 45; i++)
+  for(int i = 35; i < 46; i++)
   {
     if(pressed[i]){
       pressedCount++;
@@ -225,7 +233,7 @@ void checkDoors(void)
   }
 
   /* Continous Buzzer Delay */
-  if(pressed[0] || pressed[3] || pressed[34]) // Important pins
+  if(pressed[0] || pressed[3] || pressed[34] || pressed[35]) // Important pins
     buzzerDelay = 1000;
   else
     buzzerDelay = 60000;
