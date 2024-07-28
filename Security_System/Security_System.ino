@@ -3,22 +3,24 @@
 
 LiquidCrystal_I2C lcd(0x27, 40, 2);
 
-#define IGNITION      52
-#define BUZZER        53
-#define DELAY         2000
-#define BUZZER_DELAY  100   // Delay of the ignition 10 beeps
+#define IGNITION        52    // Ignition Pin
+#define BUZZER          53    // Buzzer Pin
+#define LCD_DELAY       2000  // Delay between changing the written on the LCD 2 seconds
+#define BUZZER_DELAY    100   // Delay of the buzzer beep 100ms
+#define SERIAL_TIMEOUT  5000  // timeout while waiting to receive from Arduino UNO (Slide Area)
 
 /* Global variables */
 bool ignitionState;
 bool pressed [46];
-int index;
-int pressedIndicies[46];
-int pressedCount;
-int oldCount;
-int buzzerDelay;
+int index;                // used for indexing in pressedIndicies array
+int pressedIndicies[46];  // Indicies of pressed inputs for their messages
+int pressedCount;         // Number of pressed inputs
+int oldCount;             // This variable used for check if new door is opened
 
 /* Timing variables */
-unsigned long long previous;
+int buzzerDelay;  // buzzer delay (6sec at important pins and 1 minute at rest of the pins)
+unsigned long long previousBeep;    // This variable checks time between each buzzer beeps dependeing on the value of buzzerDelay
+unsigned long long previousSerial;  // This variable used for timeout while waiting to receive from Arduino UNO (Slide Area)
 
 /* Messages to be displayed on lcd */
 char countMessage[21] = "Open Doors Count=   "; // Length = 20
@@ -74,15 +76,56 @@ String messages[46] =
   "Inverter Cabinet is Open"
 };
 
-/* Functions prototype */
+/*************************************************************************************************/
+/************************************** Functions prototypes *************************************/
+/*************************************************************************************************/
+
+/* This function check the ignition input
+ *  if the ignition is on do nothing
+ *  if the ignition is off tell the Arduino UNO (Slide Area) to sleep and wait for it to be on
+ *  when it becomes on wake the Arduino UNO (Slide Area) and beep the buzzer 10 beeps 
+ */
 void checkIgnition(void);
-void sendIgnitionState(void);
+
+/* This Function Wait to receive the data of the inputs from the Arduino UNO 
+ * Waiting with timeout so that it doesn't stuck here if the UNO is broken
+ * it parse the recieved string to know which inputs are pressed and which are not
+ * it modifies the 11 elements from 35 to 45 in pressed array
+ */
+void receiveSlideAreaInputs(void);
+
+/* This functions check the inputs and update pressed and pressedIndicies arrays
+ * 30 Inputs connected from pin 22 to pin 52 
+ * 5 Inputs connected to A0, A1, A2, A3, A4
+ * Update pressed and pressedIndicies arrays for Arduino UNO (Slide Area) inputs
+ * Update the buzzerDelay depending on if important pin is pressed or not
+ * Important pins are 22, 25, 51 and pin 2 in the Arduino UNO (Slide Area) 
+ * There indicies in arrays are 0, 3, 34, 35
+ */
 void checkDoors(void);
-//void newDoorBuzzer(void);
+
+/* This function make a buzzer beep if new input is pressed
+ * It checks the number of previous pressed inputs and the current pressed inputs
+ */
+void newDoorBuzzer(void);
+
+/* This function make a continous buzzer beeps if there are pressed inputs 
+ * It make beep every minute in normal, but it make beep every 6 seconds if important pin is pressed
+ */
 void buzzer(void);
+
+/* This function display pressed count message on the LCD */
 void displayPressedCount(void);
+
+/* This function updates backlight depending on wether ther are pressed inputs or not */
 void displayBacklight(void);
+
+/* This function display the messages corresponding to each pressed input */
 void displayOpenedDoors(void);
+
+/*************************************************************************************************/
+/*************************************************************************************************/
+/*************************************************************************************************/
 
 void setup() 
 {
@@ -116,7 +159,7 @@ void loop()
   checkIgnition();
 
   /* Arduino UNO Inputs */
-  sendIgnitionState();
+  receiveSlideAreaInputs();
 
   /* Check the doors */
   checkDoors();
@@ -127,48 +170,38 @@ void loop()
   /* Continous buzzer */
   buzzer();
 
-  /* Edit the display pressed Count */
+  /* Update the display pressed Count */
   displayPressedCount();
 
   /* Update the backlight */
   displayBacklight();
 
-  /* Edit the messages of the doors */
+  /* Update the messages of the doors */
   displayOpenedDoors();
 }
 
 /*************************************************************************************************/
-/************************************* Functions Declaration *************************************/
+/************************************ Functions Implementaion ************************************/
 /*************************************************************************************************/
-
-void sendIgnitionState(void)
-{
-  Serial.println("ON");
-  while (!Serial.available());
-  String receivedMessage;
-  receivedMessage = Serial.readString();
-  for(int i = 0; i < 11; i++)
-  {
-    if(receivedMessage[i] == '0')
-      pressed[35 + i] = 0;
-    else if(receivedMessage[i] == '1')
-      pressed[35 + i] = 1;
-    else
-      Serial.println("Error");
-  }
-}
 
 void checkIgnition(void)
 {
   if(digitalRead(IGNITION)) // If the ignition is off
   {
-    Serial.println("OFF");  // Tell the UNO to sleep
+    /* Sleep the Arduino UNO (Slide Area) */
+    Serial.println("OFF");  
     /* Turn Off LCD */
     lcd.clear();        
     lcd.noBacklight();
     
-    while (digitalRead(IGNITION));  // Wait until it's on
-    previous = millis();
+    /* Wait until it's on */
+    while (digitalRead(IGNITION));  
+    
+    /* Wake the Arduino UNO (Slide Area) */
+    Serial.println("ON");
+    
+    previousBeep = millis(); // Initialize this variable for buzzer beeps if there is pressed input
+
     /* 10 Wakeup Beeps */
     for(int i = 0; i < 10; i++)
     {
@@ -179,6 +212,41 @@ void checkIgnition(void)
     }
   }
 }
+
+
+void receiveSlideAreaInputs(void)
+{
+  bool slideAreaLife = true;
+  previousSerial = millis();
+  while (!Serial.available())
+  {
+    if(millis() - previousSerial > SERIAL_TIMEOUT){
+      slideAreaLife = false;
+      break;
+    }
+  }
+
+  if(slideAreaLife)
+  {
+    String receivedMessage;
+    receivedMessage = Serial.readString();
+    for(int i = 0; i < 11; i++)
+    {
+      if(receivedMessage[i] == '0')
+        pressed[35 + i] = 0;
+      else if(receivedMessage[i] == '1')
+        pressed[35 + i] = 1;
+      else
+        Serial.println("Error");
+    }
+  }
+  else
+  {
+    for(int i = 0; i < 11; i++)
+        pressed[35 + i] = 0; 
+  }
+}
+
 
 void checkDoors(void)
 {
@@ -239,6 +307,7 @@ void checkDoors(void)
     buzzerDelay = 60000;
 }
 
+
 void newDoorBuzzer(void)
 {
   if(oldCount < pressedCount){
@@ -249,16 +318,18 @@ void newDoorBuzzer(void)
   oldCount = pressedCount;
 }
 
+
 void buzzer()
 {
-  if(millis() - previous > buzzerDelay){
-    previous = millis();
+  if(millis() - previousBeep > buzzerDelay){
+    previousBeep = millis();
     digitalWrite(BUZZER, HIGH);
     delay(BUZZER_DELAY);
     digitalWrite(BUZZER, LOW);
     delay(BUZZER_DELAY);
   }
 }
+
 
 void displayPressedCount(void)
 {
@@ -271,6 +342,7 @@ void displayPressedCount(void)
   lcd.print(countMessage);
 }
 
+
 void displayBacklight(void)
 {
   if(pressedCount > 0)
@@ -279,6 +351,7 @@ void displayBacklight(void)
     lcd.noBacklight();
 }
 
+
 void displayOpenedDoors(void)
 {
   index = 0;
@@ -286,14 +359,14 @@ void displayOpenedDoors(void)
   {
     lcd.setCursor(0, 1);
     lcd.print(messages[pressedIndicies[index++]]);
-    delay(DELAY);
+    delay(LCD_DELAY);
     lcd.clear();
   }
   else if(pressedCount > 1)
   {
     lcd.setCursor(0, 1);
     lcd.print(messages[pressedIndicies[index++]]);
-    delay(DELAY);
+    delay(LCD_DELAY);
     lcd.clear();
 
     pressedCount--;
@@ -309,7 +382,7 @@ void displayOpenedDoors(void)
         lcd.print(messages[pressedIndicies[index++]]);
         pressedCount--;
       }
-      delay(DELAY);
+      delay(LCD_DELAY);
       lcd.clear();
     }
   }
