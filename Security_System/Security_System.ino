@@ -197,9 +197,6 @@ void checkIgnition(void)
     /* Wait until it's on */
     while (digitalRead(IGNITION));  
     
-    /* Wake the Arduino UNO (Slide Area) */
-    Serial.println("ON");
-    
     previousBeep = millis(); // Initialize this variable for buzzer beeps if there is pressed input
 
     /* 10 Wakeup Beeps */
@@ -211,6 +208,8 @@ void checkIgnition(void)
       delay(BUZZER_DELAY);
     }
   }
+  /* Wake the Arduino UNO (Slide Area) */
+  Serial.println("ON");
 }
 
 
