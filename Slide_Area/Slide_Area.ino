@@ -17,7 +17,7 @@ void setup()
   Serial.begin(9600);
   sleep = true;
   for(int i = 2; i < 13; i++)
-    pinMode(i, INPUT);
+    pinMode(i, INPUT_PULLUP);
 }
 
 void loop() 
